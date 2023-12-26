@@ -5,16 +5,22 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <netinet/in.h>
 
 int main(int argc, char *argv[]) {
 	if (argc == 2) {
 		int sock;
+		struct sockaddr_in addr;
 		int port = atoi(argv[1]);
-		if (sock = socket(AF_INET, SOCK_STREAM, 0)) {
+		sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (sock == -1)	{
 			write(STDERR_FILENO, "Fatal error\n", strlen("Fatal error\n"));
 			exit(1);
 		}
-		
+		if (bind(sock, (struct sockaddr *) &addr, sizeof(addr))) {
+			write(STDERR_FILENO, "Fatal error\n", strlen("Fatal error\n"));
+			exit(1);
+		}
 
 	}
 	else {
