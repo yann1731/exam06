@@ -17,13 +17,28 @@ typedef struct s_client {
 	int clientFd;
 } client;
 
+char *getMessage(int fd) {
+	char *message = NULL;
+	char buffer[4097];
+	memset(buffer, 0, 4097);
+	int bytesRead = 0;
+	do {
+		message = realloc(message, bytesRead + 1);
+		if (!message)
+			fatalError();
+		message = strcat(message, buffer);
+		message[bytesRead] = 0;
+	}
+	while (bytesRead = recv(fd, buffer, 4096, 0));
+	
+	return message;
+}
+
 int main(int argc, char *argv[]) {
 	if (argc == 2) {
 		int server;
 		int bytesRead;
-		char buffer[4097];
 		char *message = NULL;
-		memset(buffer, '\0', 4097);
 		struct sockaddr_in addr;
 		int port = atoi(argv[1]);
 		int clientId = 0;
@@ -51,10 +66,8 @@ int main(int argc, char *argv[]) {
 						FD_SET(clients[clientId++].clientFd, &currentSocket);
 					}
 					else {
-						do {
-							message = malloc(bytesRead * sizeof(char));
-						}
-						while (bytesRead = recv(i, buffer, 4096, 0));
+						message = getMessage(i);
+
 					}
 				}
 			}
