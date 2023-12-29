@@ -19,21 +19,25 @@ typedef struct s_client {
 
 int main(int argc, char *argv[]) {
 	if (argc == 2) {
-		int sock;
+		int server;
+		int bytesRead;
+		char buffer[4097];
+		char *message = NULL;
+		memset(buffer, '\0', 4097);
 		struct sockaddr_in addr;
 		int port = atoi(argv[1]);
 		int clientId = 0;
 		client clients[FD_SETSIZE];
-		sock = socket(AF_INET, SOCK_STREAM, 0);
-		if (sock == -1)
+		server = socket(AF_INET, SOCK_STREAM, 0);
+		if (server == -1)
 			fatalError();
-		if (bind(sock, (struct sockaddr *) &addr, sizeof(addr)))
+		if (bind(server, (struct sockaddr *) &addr, sizeof(addr)))
 			fatalError();
-		if (listen(sock, 4096))
+		if (listen(server, 4096))
 			fatalError();
 		fd_set currentSocket, readySocket;
 		FD_ZERO(&currentSocket);
-		FD_SET(sock, &currentSocket);
+		FD_SET(server, &currentSocket);
 		while (1) {
 			readySocket = currentSocket;
 			if (select(FD_SETSIZE, &readySocket, NULL, NULL, NULL) < 0) {
@@ -41,13 +45,16 @@ int main(int argc, char *argv[]) {
 			}
 			for (int i = 0; i < FD_SETSIZE; ++i) {
 				if (FD_ISSET(i, &readySocket)) {
-					if (i == sock) {
-						clients[clientId++].clientFd = accept(sock, (struct sockaddr *) &addr, sizeof(addr));
+					if (i == server) {
+						clients[clientId].clientFd = accept(server, (struct sockaddr *) &addr, sizeof(addr));
 						clients[clientId].clientId = clientId;
-						FD_SET(clients[clientId - 1].clientFd, &currentSocket);
+						FD_SET(clients[clientId++].clientFd, &currentSocket);
 					}
 					else {
-						
+						do {
+							message = malloc(bytesRead * sizeof(char));
+						}
+						while (bytesRead = recv(i, buffer, 4096, 0));
 					}
 				}
 			}
