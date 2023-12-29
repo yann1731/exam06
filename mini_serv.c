@@ -77,6 +77,4 @@ int main(int argc, char *argv[]) {
 		write(STDERR_FILENO, "Wrong number of arguments\n", strlen("Wrong number of arguments\n"));
 		exit(1);
 	}
-	
-	return 0;
 }
