@@ -39,14 +39,22 @@ int main(int argc, char *argv[]) {
 		int server;
 		int bytesRead;
 		char *message = NULL;
+		char *fullMessage = NULL;
+		char buffer[4097];
+		memset(buffer, 0, 4097);
 		struct sockaddr_in addr;
 		int port = atoi(argv[1]);
+		if (port <= 0)
+			fatalError();
+		addr.sin_family = AF_INET;
+		addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+		addr.sin_port = htons(port);
 		int clientId = 0;
 		client clients[FD_SETSIZE];
 		server = socket(AF_INET, SOCK_STREAM, 0);
 		if (server == -1)
 			fatalError();
-		if (bind(server, (struct sockaddr *) &addr, sizeof(addr)))
+		if (bind(server, (struct sockaddr *) &addr, (socklen_t) sizeof(addr)))
 			fatalError();
 		if (listen(server, 4096))
 			fatalError();
@@ -61,13 +69,20 @@ int main(int argc, char *argv[]) {
 			for (int i = 0; i < FD_SETSIZE; ++i) {
 				if (FD_ISSET(i, &readySocket)) {
 					if (i == server) {
-						clients[clientId].clientFd = accept(server, (struct sockaddr *) &addr, sizeof(addr));
-						clients[clientId].clientId = clientId;
-						FD_SET(clients[clientId++].clientFd, &currentSocket);
+						printf("new client %d is connected", clientId);
+						clients[i].clientFd = accept(server, (struct sockaddr *) &addr, sizeof(addr));
+						sprintf(buffer, "server: client %d just arrived\n", clientId);
+						clients[i].clientId = clientId++;
+						FD_SET(clients[i].clientFd, &currentSocket);
+						for (int i = 0; i < FD_SETSIZE; i++) {
+							send(clients[i].clientFd, buffer, strlen(buffer), 0);
+						}
+						memset(buffer, 0, 4097);
 					}
 					else {
-						message = getMessage(i);
-
+						// message = getMessage(i);
+						// snprintf(buffer, 4096, "Client %d: ", clients[i])
+						// fullMessage = realloc()
 					}
 				}
 			}
