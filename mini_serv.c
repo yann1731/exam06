@@ -149,8 +149,9 @@ int main(int argc, char *argv[]) {
 									strcat(returnMessage, buffer);
 									returnMessage = realloc(returnMessage, strlen(returnMessage) + strlen(message));
 									strcat(returnMessage, message);
+									free(message);
+									message = NULL;
                                 }
-								free(message);
 								free(bufferCopy);
 								for (int j = 0; j < FD_SETSIZE; j++)
 									if (j != sockfd && j != i)
