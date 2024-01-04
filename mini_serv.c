@@ -1,106 +1,156 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
+#include <errno.h>
 #include <string.h>
-#include <sys/select.h>
+#include <unistd.h>
+#include <netdb.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <netinet/in.h>
+#include <sys/select.h>
+#include <sys/types.h>
 
-void fatalError() {
-	write(STDERR_FILENO, "Fatal error\n", strlen("Fatal error\n"));
-	exit(1);
+void handleError(char *message) {
+    write(2, message, strlen(message));
+    exit(1);
 }
 
-typedef struct s_client {
-	int clientId;
-	int clientFd;
-} client;
+int extract_message(char **buf, char **msg)
+{
+	char	*newbuf;
+	int	i;
+
+	*msg = 0;
+	if (*buf == 0)
+		return (0);
+	i = 0;
+	while ((*buf)[i])
+	{
+		if ((*buf)[i] == '\n')
+		{
+			newbuf = calloc(1, sizeof(*newbuf) * (strlen(*buf + i + 1) + 1));
+			if (newbuf == 0)
+				return (-1);
+			strcpy(newbuf, *buf + i + 1);
+			*msg = *buf;
+			(*msg)[i + 1] = 0;
+			*buf = newbuf;
+			return (1);
+		}
+		i++;
+	}
+	return (0);
+}
+
+char *str_join(char *buf, char *add)
+{
+	char	*newbuf;
+	int		len;
+
+	if (buf == 0)
+		len = 0;
+	else
+		len = strlen(buf);
+	newbuf = malloc(sizeof(*newbuf) * (len + strlen(add) + 1));
+	if (newbuf == 0)
+		return (0);
+	newbuf[0] = 0;
+	if (buf != 0)
+		strcat(newbuf, buf);
+	free(buf);
+	strcat(newbuf, add);
+	return (newbuf);
+}
+
+typedef s_client {
+    int clientId;
+} t_client;
+
+
 
 int main(int argc, char *argv[]) {
-	if (argc == 2) {
-		printf("Server starting\n");
-		int server;
-		char bufferOne[4097];
-		memset(bufferOne, 0, 4097);
-		char bufferTwo[4097];
-		memset(bufferTwo, 0, 4097);
-		int clientList[FD_SETSIZE];
-		int currentClients = 0;
-		struct sockaddr_in addr;
-		socklen_t len;
-		int port = atoi(argv[1]);
-		addr.sin_family = AF_INET;
-		addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-		addr.sin_port = htons(port);
-		int clientId = 0;
-		client clients[FD_SETSIZE];
-		memset(clients, 0, sizeof(clients));
-		server = socket(AF_INET, SOCK_STREAM, 0);
-		if (server == -1)
-			fatalError();
-		if (bind(server, (struct sockaddr *) &addr, (socklen_t) sizeof(addr)))
-			fatalError();
-		if (listen(server, 4096))
-			fatalError();
-		fd_set currentSocket, readySocket;
-		FD_ZERO(&currentSocket);
-		FD_SET(server, &currentSocket);
-		while (1) {
-			readySocket = currentSocket;
-			int valueFromSelect = 0;
-			if ((valueFromSelect = select(FD_SETSIZE, &readySocket, NULL, NULL, NULL)) < 0) {
-				fatalError();
-			}
-			if (FD_ISSET(server, &readySocket)) { //handle client connection
-				int client = accept(server, (struct sockaddr *) &addr, &len);
-				clients[client].clientFd = client;
-				clients[client].clientId = clientId;
-				clientList[clientId] = client;
-				FD_SET(client, &currentSocket);
-				sprintf(bufferOne, "Client %d just arrived\n", clientId);
-				currentClients++;
-				clientId++; 
-				for (int i = 0; i < currentClients; i++) {
-					send(clientList[i], bufferOne, strlen(bufferOne), 0);
-				}
-				memset(bufferOne, 0, 4097);
-			}
-			else { //handle possible client messages
-				for (int i = 0; i < currentClients; i++) {
-					if (FD_ISSET(clientList[i], &readySocket)) {
-						int bytesRead = recv(clientList[i], bufferTwo, 4096, 0);
-						if (bytesRead > 0) { //handle message
-							sprintf(bufferOne, "Client %d: ", clients[clientList[i]].clientId);
-							strcat(bufferOne, bufferTwo);
-							for (int j = 0; j < currentClients; j++) {
-								if (j != i) {
-									send(clientList[j], bufferOne, strlen(bufferOne), 0);
-								}
-							}
-						}
-						else { //handle disconnect
-							sprintf(bufferOne, "server: client %d just left\n", clients[clientList[i]].clientId);
-							FD_CLR(clientList[i], &currentSocket);
-							clients[clientList[i]].clientId = 0;
-							clients[clientList[i]].clientFd = 0;
-							close(clientList[i]);
-							clientList[i] = 0;
-							for (int j = 0; j < currentClients; j++) {
-								if (j != i) {
-									send(clientList[j], bufferOne, strlen(bufferOne), 0);
-								}
-							}
-						}
-						memset(bufferOne, 0, 4097);
-						memset(bufferTwo, 0, 4097);
-					}
-				}
-			}
-		}
-	}
-	else {
-		write(STDERR_FILENO, "Wrong number of arguments\n", strlen("Wrong number of arguments\n"));
-		exit(1);
-	}
+    if (argc == 2) {
+        int sockfd, connfd, len;
+	    struct sockaddr_in servaddr, cli;
+        t_client clients[FD_SETSIZE];
+        bzero(clients, sizeof(clients));
+        char buffer[4096];
+        bzero(buffer, 4096);
+        int clientId = 0;
+
+	    // socket create and verification 
+	    sockfd = socket(AF_INET, SOCK_STREAM, 0); 
+	    if (sockfd == -1)
+            handleError("Fatal error\n");
+	    bzero(&servaddr, sizeof(servaddr)); 
+
+	    // assign IP, PORT 
+	    servaddr.sin_family = AF_INET; 
+	    servaddr.sin_addr.s_addr = htonl(2130706433); //127.0.0.1
+	    servaddr.sin_port = htons(atoi(argv[1])); 
+    
+	    // Binding newly created socket to given IP and verification 
+	    if ((bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr))) != 0)
+            handleError("Fatal error\n");
+	    if (listen(sockfd, FD_SET) != 0)
+            handleError("Fatal error\n");
+        fd_set readySockets, currentSockets;
+        FD_ZERO(&currentSockets);
+        FD_SET(sockfd, &currentSockets);
+        while (1) {
+            readySockets = currentSockets;
+            int numSock = select(FD_SETSIZE, &readySockets, NULL, NULL, NULL);
+            if (numSock < 0)
+                handleError("Fatal error\n");
+            else if (numSock > 0) {
+                if (FD_ISSET(sockfd, &readySockets)) { //new client connecting
+	                len = sizeof(cli);
+	                connfd = accept(sockfd, (struct sockaddr *)&cli, &len);
+                    FD_SET(connfd, &currentSockets);
+	                if (connfd < 0)
+                        handleError("Fatal error\n");
+                    clients[connfd].clientId = clientId;
+                    clientId++;
+                    sprintf(buffer, "server: client %d just arrived\n", clients[connfd].clientId);
+                    for (int i = 0; i < FD_SETSIZE; i++)
+                        if (i != sockfd && i != connfd)
+                            send(i, buffer, 4095, 0);
+                    bzero(buffer, 4095);
+                }
+                else {
+                    for (int i = 0; i < FD_SETSIZE; i++) {
+                        if (FD_ISSET(i, &readySockets)) {
+                            int bytesRead = recv(i, buffer, 4095, 0);
+                            if (bytesRead == 0) { //disconnect client
+                                FD_CLR(i, &currentSockets);
+                                close(i);
+                                sprintf(buffer, "server: client %d has left\n", clients[i].clientId);
+                                clients[i].clientId = 0;
+                                for (int j = 0; j < FD_SETSIZE; j++)
+                                    if (j != sockfd && j != i)
+                                        send(j, buffer, 4095, 0);
+                                bzero(buffer, sizeof(buffer));
+                            }
+                            else if (bytesRead == 4095) { //most likely should have more shit to send
+
+                            }
+                            else { // whole message should be received
+                                char *bufferCopy = calloc(strlen(buffer) + 1);
+                                bzero(buffer, 4096);
+                                char *message = NULL;
+                                char *returnMessage = NULL;
+                                strcpy(bufferCopy, message);
+                                sprintf(buffer, "client %d: ", clients[i].clientId)
+                                while (extract_message(bufferCopy, message) != 0) {
+                                    returnMessage 
+                                }
+
+                            }
+                        }
+                    }
+                }
+            }
+            else
+                continue ;
+        }
+    }
+    else
+        handleError("wrong number of arguments\n");
 }
