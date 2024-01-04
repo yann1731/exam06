@@ -25,7 +25,7 @@ int extract_message(char **buf, char **msg)
 	i = 0;
 	while ((*buf)[i])
 	{
-		if ((*buf)[i] == '\n')
+		if ((*buf)[i] == '\n' || (*buf)[i + 1] == 0)
 		{
 			newbuf = calloc(1, sizeof(*newbuf) * (strlen(*buf + i + 1) + 1));
 			if (newbuf == 0)
@@ -74,8 +74,8 @@ int main(int argc, char *argv[]) {
 	    struct sockaddr_in servaddr, cli;
         t_client clients[FD_SETSIZE];
         bzero(clients, sizeof(clients));
-        char buffer[4096];
-        bzero(buffer, 4096);
+        char buffer[200000];
+        bzero(buffer, sizeof(buffer));
         int clientId = 0;
 
 	    // socket create and verification 
