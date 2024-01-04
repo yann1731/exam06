@@ -6,6 +6,8 @@
 #include <netinet/in.h>
 #include <sys/select.h>
 #include <sys/types.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 void handleError(char *message) {
     write(2, message, strlen(message));
@@ -59,7 +61,7 @@ char *str_join(char *buf, char *add)
 	return (newbuf);
 }
 
-typedef s_client {
+typedef struct s_client {
     int clientId;
 } t_client;
 
@@ -67,7 +69,8 @@ typedef s_client {
 
 int main(int argc, char *argv[]) {
     if (argc == 2) {
-        int sockfd, connfd, len;
+        int sockfd, connfd;
+		socklen_t len;
 	    struct sockaddr_in servaddr, cli;
         t_client clients[FD_SETSIZE];
         bzero(clients, sizeof(clients));
@@ -89,7 +92,7 @@ int main(int argc, char *argv[]) {
 	    // Binding newly created socket to given IP and verification 
 	    if ((bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr))) != 0)
             handleError("Fatal error\n");
-	    if (listen(sockfd, FD_SET) != 0)
+	    if (listen(sockfd, FD_SETSIZE) != 0)
             handleError("Fatal error\n");
         fd_set readySockets, currentSockets;
         FD_ZERO(&currentSockets);
@@ -129,19 +132,31 @@ int main(int argc, char *argv[]) {
                                 bzero(buffer, sizeof(buffer));
                             }
                             else if (bytesRead == 4095) { //most likely should have more shit to send
-
+								printf("Fuck that shit for now\n");
                             }
                             else { // whole message should be received
-                                char *bufferCopy = calloc(strlen(buffer) + 1);
-                                bzero(buffer, 4096);
+                                char *bufferCopy = calloc(sizeof(char), strlen(buffer) + 1);
                                 char *message = NULL;
                                 char *returnMessage = NULL;
-                                strcpy(bufferCopy, message);
-                                sprintf(buffer, "client %d: ", clients[i].clientId)
-                                while (extract_message(bufferCopy, message) != 0) {
-                                    returnMessage 
+                                strcpy(bufferCopy, buffer);
+                                bzero(buffer, 4096);
+                                sprintf(buffer, "client %d: ", clients[i].clientId);
+                                while (extract_message(&bufferCopy, &message) != 0) {
+									if (returnMessage)
+                                    	returnMessage = realloc(returnMessage, strlen(buffer) + strlen(returnMessage));
+									else
+										returnMessage = realloc(returnMessage, strlen(buffer));
+									strcat(returnMessage, buffer);
+									returnMessage = realloc(returnMessage, strlen(returnMessage) + strlen(message));
+									strcat(returnMessage, message);
                                 }
-
+								free(message);
+								free(bufferCopy);
+								for (int j = 0; j < FD_SETSIZE; j++)
+									if (j != sockfd && j != i)
+										send(j, returnMessage, strlen(returnMessage), 0);
+								free(returnMessage);
+								bzero(buffer, 4096);
                             }
                         }
                     }
