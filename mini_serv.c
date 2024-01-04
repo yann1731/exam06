@@ -114,32 +114,29 @@ int main(int argc, char *argv[]) {
                     sprintf(buffer, "server: client %d just arrived\n", clients[connfd].clientId);
                     for (int i = 0; i < FD_SETSIZE; i++)
                         if (i != sockfd && i != connfd)
-                            send(i, buffer, 4095, 0);
-                    bzero(buffer, 4095);
+                            send(i, buffer, strlen(buffer), 0);
+                    bzero(buffer, sizeof(buffer));
                 }
                 else {
                     for (int i = 0; i < FD_SETSIZE; i++) {
                         if (FD_ISSET(i, &readySockets)) {
-                            int bytesRead = recv(i, buffer, 4095, 0);
+                            int bytesRead = recv(i, buffer, sizeof(buffer) - 1, 0);
                             if (bytesRead == 0) { //disconnect client
                                 FD_CLR(i, &currentSockets);
                                 close(i);
-                                sprintf(buffer, "server: client %d has left\n", clients[i].clientId);
+                                sprintf(buffer, "server: client %d just left\n", clients[i].clientId);
                                 clients[i].clientId = 0;
                                 for (int j = 0; j < FD_SETSIZE; j++)
                                     if (j != sockfd && j != i)
-                                        send(j, buffer, 4095, 0);
+                                        send(j, buffer, strlen(buffer), 0);
                                 bzero(buffer, sizeof(buffer));
-                            }
-                            else if (bytesRead == 4095) { //most likely should have more shit to send
-								printf("Fuck that shit for now\n");
                             }
                             else { // whole message should be received
                                 char *bufferCopy = calloc(sizeof(char), strlen(buffer) + 1);
                                 char *message = NULL;
                                 char *returnMessage = NULL;
                                 strcpy(bufferCopy, buffer);
-                                bzero(buffer, 4096);
+                                bzero(buffer, sizeof(buffer));
                                 sprintf(buffer, "client %d: ", clients[i].clientId);
                                 while (extract_message(&bufferCopy, &message) != 0) {
 									if (returnMessage)
